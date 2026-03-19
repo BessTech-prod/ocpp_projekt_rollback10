@@ -1,0 +1,15 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Secrets/env
+.env
+*.env
+
+# Runtime data (adjust if you want some tracked)
+evcsms/data/
+evcsms/config/
+
+# IDE
+.idea/
+.vscode/

@@ -1,0 +1,82 @@
+version: '3'
+
+services:
+  redis-service:
+    image: redis:7-alpine
+    container_name: redis-service
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-defaultpassword}
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-defaultpassword}"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ocpp-ws-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ocpp_ws
+    container_name: ocpp-ws-service
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      - REDIS_HOST=redis-service
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-defaultpassword}
+      - OCPP_PORT=9000
+    volumes:
+      - ./data:/data
+      - ./config:/data/config
+    depends_on:
+      - redis-service
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 9000)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  api-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: api-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis-service
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-defaultpassword}
+      - API_PORT=8000
+      - APP_SECRET=${APP_SECRET:-dev-secret-change-me}
+    volumes:
+      - ./data:/data
+      - ./config:/data/config
+    depends_on:
+      - redis-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ui-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ui
+    container_name: ui-service
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

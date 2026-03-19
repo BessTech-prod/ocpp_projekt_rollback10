@@ -2,7 +2,7 @@
 <html lang="sv">
 <head>
   <meta charset="utf-8" />
-  <title>TakoramaCharge – Dashboard</title>
+  <title>TakoramaCharge – Överblick</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <!-- CSS -->
@@ -21,7 +21,7 @@
         <img src="/assets/logo_trans_vit.png"
              srcset="/assets/logo_trans_vit.png 1x, /assets/logo_trans_vit.png 2x"
              class="brand-logo" alt="TakoramaCharge">
-        <span class="brand-text ms-2">Dashboard</span>
+        <span class="brand-text ms-2">Överblick</span>
       </a>
 
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain"
@@ -32,9 +32,9 @@
       <div class="collapse navbar-collapse justify-content-end" id="navMain">
         <ul class="navbar-nav align-items-center gap-2">
 
-          <!-- Dashboard -->
+          <!-- Överblick -->
           <li class="nav-item">
-            <a href="javascript:void(0)" class="nav-link js-go-dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
+            <a href="javascript:void(0)" class="nav-link js-go-dashboard"><i class="bi bi-speedometer2"></i> Överblick</a>
           </li>
 
           <li class="nav-item">
@@ -71,10 +71,9 @@
     </section>
 
     <div id="cp-status-cards" class="row g-3 stats-grid">
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Totalt</div><div class="h3 m-0 skeleton" style="height:2rem;"></div></div></div></div>
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Charging</div><div class="h3 m-0 skeleton" style="height:2rem;"></div></div></div></div>
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Available</div><div class="h3 m-0 skeleton" style="height:2rem;"></div></div></div></div>
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Faulted</div><div class="h3 m-0 skeleton" style="height:2rem;"></div></div></div></div>
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Ledig</div><div class="h3 m-0 skeleton" style="height:2rem;"></div></div></div></div>
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Laddar</div><div class="h3 m-0 skeleton" style="height:2rem;"></div></div></div></div>
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Ur drift</div><div class="h3 m-0 skeleton" style="height:2rem;"></div></div></div></div>
     </div>
     <div id="cp-grid" class="row g-3">
       <div class="col-12 col-md-6 col-lg-4"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="skeleton" style="height:1.2rem;max-width:70%;"></div><div class="skeleton mt-3" style="height:1rem;"></div><div class="skeleton mt-2" style="height:1rem;"></div></div></div></div>
@@ -86,12 +85,10 @@
 
     <section class="status-legend-panel">
       <ul class="list-inline mb-0">
-        <li class="list-inline-item"><span class="badge status-charging">Charging</span></li>
-        <li class="list-inline-item"><span class="badge status-available">Available</span></li>
-        <li class="list-inline-item"><span class="badge status-preparing">Preparing/Finishing</span></li>
-        <li class="list-inline-item"><span class="badge status-suspended">Suspended</span></li>
-        <li class="list-inline-item"><span class="badge status-faulted">Faulted</span></li>
-        <li class="list-inline-item"><span class="badge status-unavailable">Unavailable</span></li>
+        <li class="list-inline-item"><span class="badge status-charging">Laddar</span></li>
+        <li class="list-inline-item"><span class="badge status-available">Ledig</span></li>
+        <li class="list-inline-item"><span class="badge status-faulted">Ur drift</span></li>
+        <li class="list-inline-item"><span class="badge status-unavailable">Otillgänglig</span></li>
       </ul>
     </section>
 

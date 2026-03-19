@@ -41,17 +41,16 @@
     const host = $('#cp-status-cards');
     if (!host) return;
 
-    const counters = { total: cps.length, charging: 0, available: 0, faulted: 0 };
+    const counters = { charging: 0, available: 0, faulted: 0 };
     cps.forEach(cpId => {
       const bucket = cpState(statusData[cpId] || {});
       if (bucket in counters) counters[bucket] += 1;
     });
 
     host.innerHTML = `
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Totalt</div><div class="h3 m-0">${counters.total}</div></div></div></div>
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Charging</div><div class="h3 m-0">${counters.charging}</div></div></div></div>
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Available</div><div class="h3 m-0">${counters.available}</div></div></div></div>
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Faulted</div><div class="h3 m-0">${counters.faulted}</div></div></div></div>`;
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Ledig</div><div class="h3 m-0">${counters.available}</div></div></div></div>
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Laddar</div><div class="h3 m-0">${counters.charging}</div></div></div></div>
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Ur drift</div><div class="h3 m-0">${counters.faulted}</div></div></div></div>`;
   }
 
   // ------- Org-filter (endast portal_admin/admin) -------
@@ -93,7 +92,7 @@
   function renderGrid(cps, statusData){
     const grid = $('#cp-grid'); grid.innerHTML='';
     if(!cps || !cps.length){
-      grid.innerHTML = `<div class="col-12"><div class="alert alert-warning mb-0">Ingen laddare ansluten ännu.</div></div>`;
+      grid.innerHTML = `<div class="col-12"><div class="alert alert-warning mb-0">Ingen laddare ansluten, kontakta din leverantör.</div></div>`;
       return;
     }
 

@@ -73,8 +73,11 @@ services:
       dockerfile: docker/Dockerfile.ui
     container_name: ui-service
     restart: unless-stopped
-    ports:
-      - "80:80"
+    # Port 80 is NOT bound to host - nginx-proxy owns host ports 80/443
+    # and proxies to this container internally on the Docker network.
+    # expose makes port 80 reachable to nginx-proxy without host binding.
+    expose:
+      - "80"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/"]
       interval: 30s

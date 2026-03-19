@@ -47,7 +47,7 @@
     const q=($('#filterInput')?.value||'').toLowerCase();
     const rows = Object.entries(map||{}).map(([tag,u])=>{
       const name = u?.name || [u?.first_name,u?.last_name].filter(Boolean).join(' ') || tag;
-      return { tag, name };
+      return { tag, name, user: u };
     }).filter(r=> !q || r.name.toLowerCase().includes(q) || r.tag.toLowerCase().includes(q))
       .sort((a,b)=> a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
     if(!rows.length){ tbody.innerHTML=`<tr><td colspan="3" class="text-center text-muted">Inga användare.</td></tr>`; if(foot) foot.textContent=''; return; }
@@ -55,9 +55,33 @@
       <tr>
         <td>${esc(r.name)}</td>
         <td><code>${esc(r.tag)}</code></td>
-        <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-del="${esc(r.tag)}" type="button"><i class="bi bi-trash"></i> Ta bort</button></td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-primary" data-edit="${esc(r.tag)}" type="button"><i class="bi bi-pencil"></i> Redigera</button> <button class="btn btn-sm btn-outline-danger" data-del="${esc(r.tag)}" type="button"><i class="bi bi-trash"></i> Ta bort</button></td>
       </tr>`).join('');
     if(foot) foot.textContent = `Visar ${rows.length} användare.`;
+
+    // Handle edit button
+    $$('#users-table button[data-edit]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const tag=btn.getAttribute('data-edit'); if(!tag) return;
+        const u = Object.entries(map||{}).find(([t])=> t===tag)?.[1];
+        if(!u) return;
+        // Populate form with user data
+        $('#firstName').value = u.first_name || '';
+        $('#lastName').value = u.last_name || '';
+        $('#rfidTag').value = tag;
+        $('#role').value = u.role || 'user';
+        $('#email').value = u.email || '';
+        $('#password').value = '';
+        $('#editingTag').value = tag;
+        // Update form state for editing
+        $('#btnSaveLabel').textContent = 'Uppdatera';
+        $('#btnCancel').classList.remove('d-none');
+        $('#rfidTag').disabled = true;
+        // Scroll to form
+        $('#add-user-form')?.scrollIntoView({behavior:'smooth'});
+      });
+    });
+
     $$('#users-table button[data-del]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const tag=btn.getAttribute('data-del'); if(!tag) return;
@@ -81,10 +105,22 @@
     $('#filterInput')?.addEventListener('input', refresh);
 
     const form = $('#add-user-form');
+
+    // Cancel button handler
+    $('#btnCancel')?.addEventListener('click', ()=>{
+      form.reset();
+      form.classList.remove('was-validated');
+      $('#editingTag').value = '';
+      $('#btnSaveLabel').textContent = 'Lägg till';
+      $('#btnCancel').classList.add('d-none');
+      $('#rfidTag').disabled = false;
+    });
+
     $('#btnSaveUser')?.addEventListener('click', async (e)=>{
       e.preventDefault(); e.stopPropagation(); form.classList.add('was-validated');
       if(!form.checkValidity()) return;
 
+      const isEditing = $('#editingTag').value !== '';
       const payload = {
         tag: ($('#rfidTag')?.value||'').trim(),
         first_name: ($('#firstName')?.value||'').trim(),
@@ -96,7 +132,18 @@
         password: ($('#password')?.value||undefined)
       };
 
-      try{ await postJSON(API.map, payload); toast(`Användaren "${payload.name}" sparades`,'success'); form.reset(); form.classList.remove('was-validated'); await refresh(); }
+      try{
+        await postJSON(API.map, payload);
+        const action = isEditing ? 'uppdaterad' : 'sparad';
+        toast(`Användaren "${payload.name}" ${action}`,'success');
+        form.reset();
+        form.classList.remove('was-validated');
+        $('#editingTag').value = '';
+        $('#btnSaveLabel').textContent = 'Lägg till';
+        $('#btnCancel').classList.add('d-none');
+        $('#rfidTag').disabled = false;
+        await refresh();
+      }
       catch(e){ alertBox(`Kunde inte spara: ${e.message}`); }
     });
 

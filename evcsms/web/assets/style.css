@@ -298,7 +298,7 @@ a:hover, .btn-link:hover {
 
 @media (min-width: 992px) {
   .navbar .navbar-brand {
-    flex: 0 0 clamp(255px, 24vw, 360px);
+    flex: 0 0 auto;
     margin-right: 1.25rem;
   }
 }
@@ -311,8 +311,6 @@ a:hover, .btn-link:hover {
   text-transform: uppercase;
   white-space: nowrap;
   margin-left: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .navbar .navbar-collapse {

@@ -4,6 +4,14 @@
 
   const $ = (s)=>document.querySelector(s);
 
+  function setDashboardHeading(me){
+    const heading = $('.page-header h1');
+    if (!heading) return;
+    const orgName = String(me?.org_name || '').trim();
+    const orgId = String(me?.org_id || '').trim();
+    if (orgName || orgId) heading.textContent = orgName || orgId;
+  }
+
   function displayCpId(x){
     try { return String(x||'').split('/').pop() || String(x||''); }
     catch { return String(x||''); }
@@ -33,17 +41,16 @@
     const host = $('#cp-status-cards');
     if (!host) return;
 
-    const counters = { total: cps.length, charging: 0, available: 0, faulted: 0 };
+    const counters = { charging: 0, available: 0, faulted: 0 };
     cps.forEach(cpId => {
       const bucket = cpState(statusData[cpId] || {});
       if (bucket in counters) counters[bucket] += 1;
     });
 
     host.innerHTML = `
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Totalt</div><div class="h3 m-0">${counters.total}</div></div></div></div>
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Charging</div><div class="h3 m-0">${counters.charging}</div></div></div></div>
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Available</div><div class="h3 m-0">${counters.available}</div></div></div></div>
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Faulted</div><div class="h3 m-0">${counters.faulted}</div></div></div></div>`;
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Ledig</div><div class="h3 m-0">${counters.available}</div></div></div></div>
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Laddar</div><div class="h3 m-0">${counters.charging}</div></div></div></div>
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Ur drift</div><div class="h3 m-0">${counters.faulted}</div></div></div></div>`;
   }
 
   function render(cps, status){
@@ -83,6 +90,7 @@
 
   document.addEventListener('DOMContentLoaded', async ()=>{
     const me = await UI.initPage({ requiredRoles:['org_admin'] }); if(!me) return;
+    setDashboardHeading(me);
     await tick();
     timer = setInterval(tick, 2000);
     document.addEventListener('visibilitychange', ()=>{

@@ -62,7 +62,7 @@ Note: `evcsms/config/**` exists in repository and is also mounted in runtime. If
 Local commands:
 
 ```bash
-cd /home/hugo/PycharmProjects/ocpp_prod-main/ocpp_projekt_rollback10
+cd /home/hugo/PycharmProjects/ocpp_prod-main/ocpp_projekt_rollback1.1
 git status
 git add evcsms/ Manuals/
 git commit -m "Release: describe change"

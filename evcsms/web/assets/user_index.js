@@ -5,6 +5,14 @@
   const API = { cps:'/api/cps', status:'/api/status' };
   const $ = (s)=>document.querySelector(s);
 
+  function setDashboardHeading(me){
+    const heading = $('.page-header h1');
+    if (!heading) return;
+    const orgName = String(me?.org_name || '').trim();
+    const orgId = String(me?.org_id || '').trim();
+    if (orgName || orgId) heading.textContent = orgName || orgId;
+  }
+
   function displayCpId(id){
     try { return String(id||'').split('/').pop() || String(id||''); }
     catch { return String(id||''); }
@@ -34,17 +42,16 @@
     const host = $('#cp-status-cards');
     if (!host) return;
 
-    const counters = { total: cps.length, charging: 0, available: 0, faulted: 0 };
+    const counters = { charging: 0, available: 0, faulted: 0 };
     cps.forEach(cpId => {
       const bucket = cpState(statusData[cpId] || {});
       if (bucket in counters) counters[bucket] += 1;
     });
 
     host.innerHTML = `
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Totalt</div><div class="h3 m-0">${counters.total}</div></div></div></div>
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Charging</div><div class="h3 m-0">${counters.charging}</div></div></div></div>
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Available</div><div class="h3 m-0">${counters.available}</div></div></div></div>
-      <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Faulted</div><div class="h3 m-0">${counters.faulted}</div></div></div></div>`;
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Ledig</div><div class="h3 m-0">${counters.available}</div></div></div></div>
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Laddar</div><div class="h3 m-0">${counters.charging}</div></div></div></div>
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Ur drift</div><div class="h3 m-0">${counters.faulted}</div></div></div></div>`;
   }
 
   function renderGrid(cps, statusMap){
@@ -98,6 +105,8 @@
   document.addEventListener('DOMContentLoaded', async ()=>{
     // Endast user
     const me = await UI.initPage({ requiredRoles:['user'] }); if(!me) return;
+
+    setDashboardHeading(me);
 
     // Start poll
     await tick();

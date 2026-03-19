@@ -19,7 +19,7 @@
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain"><span class="navbar-toggler-icon"></span></button>
       <div class="collapse navbar-collapse justify-content-end" id="navMain">
         <ul class="navbar-nav align-items-center gap-2">
-          <li class="nav-item"><a class="nav-link js-go-dashboard" href="javascript:void(0)"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link js-go-dashboard" href="javascript:void(0)"><i class="bi bi-speedometer2"></i> Överblick</a></li>
           <li class="nav-item"><a class="nav-link" href="/ui/portal/live_ops.html"><i class="bi bi-broadcast-pin"></i> Live driftpanel</a></li>
           <li class="nav-item"><a class="nav-link" href="/ui/portal/cps.html"><i class="bi bi-diagram-3"></i> Laddare</a></li>
           <li class="nav-item" data-visible-roles="portal_admin,admin">
@@ -29,10 +29,9 @@
 </li>
           <li class="nav-item">
             <a href="#" class="nav-link" data-route-portal="/ui/portal/add_user.html" data-route-org="/ui/org/add_user.html" data-route-user="/ui/user/index.html">
-              <i class="bi bi-person-plus"></i> Lägg till användare
+              <i class="bi bi-person-plus"></i> Användare
             </a>
           </li>
-          <li class="nav-item"><a href="#" class="nav-link" data-route-portal="/ui/users.html" data-route-org="/ui/org/users.html" data-route-user="/ui/user/index.html"><i class="bi bi-people"></i> Användare</a></li>
           <li class="nav-item"><a href="#" class="nav-link" data-route-portal="/ui/users_history.html" data-route-org="/ui/org/history.html" data-route-user="/ui/user/index.html"><i class="bi bi-clock-history"></i> Historik</a></li>
           <li class="nav-item"><a href="#" class="nav-link" data-route-portal="/ui/my.html" data-route-org="/ui/org/my.html" data-route-user="/ui/user/my.html"><i class="bi bi-person-badge"></i> Min statistik</a></li>
 
@@ -49,12 +48,13 @@
 
     <section class="page-header">
       <div>
-        <h1 class="h4 m-0">Tilldela laddare till organisation</h1>
-        <p class="page-subtitle">Koppla anslutna laddare till rätt organisation och håll laddarlistan uppdaterad.</p>
+        <h1 class="h4 m-0">Administrera Laddare</h1>
+        <p class="page-subtitle">Koppla ny anslutna laddare till rätt organisation och administrera befintliga.</p>
       </div>
     </section>
 
     <div class="row g-3 align-items-baseline mb-3 toolbar-panel">
+      <input type="hidden" id="editingCp" value="">
       <div class="col-12 col-md-5">
         <label for="cpPick" class="form-label mb-1">Välj Laddare (ID)</label>
         <select id="cpPick" class="form-select"></select>
@@ -65,20 +65,23 @@
         <select id="orgPick" class="form-select"></select>
       </div>
       <div class="col-12 col-md-2 d-grid align-self-end">
-        <button id="btnAssign" class="btn btn-primary" type="button"><i class="bi bi-link-45deg"></i> Tilldela</button>
+        <button id="btnAssign" class="btn btn-primary" type="button"><i class="bi bi-link-45deg"></i> <span id="btnAssignLabel">Tilldela</span></button>
+      </div>
+      <div class="col-12 col-md-2 d-grid align-self-end">
+        <button id="btnCancel" class="btn btn-outline-secondary d-none" type="button"><i class="bi bi-x-circle"></i> <span>Avbryt</span></button>
       </div>
     </div>
 
     <h2 class="h5 mb-2">Alla laddare</h2>
     <div class="table-responsive shadow-sm table-panel">
       <table class="table table-sm table-striped align-middle" id="cps-table">
-        <thead class="table-dark"><tr><th>Laddare‑ID</th><th>Organisation</th><th class="text-end" style="width:160px;">Ta bort</th></tr></thead>
+        <thead class="table-dark"><tr><th>Laddare‑ID</th><th>Organisation</th><th class="text-end" style="width:260px;">Åtgärder</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
 
     <div class="back-link-wrap">
-      <a href="javascript:void(0)" class="js-go-dashboard back-link">← Tillbaka till dashboard</a>
+      <a href="javascript:void(0)" class="js-go-dashboard back-link">← Tillbaka till överblick</a>
     </div>
   </main>
 

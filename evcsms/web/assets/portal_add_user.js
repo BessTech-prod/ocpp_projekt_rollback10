@@ -21,7 +21,7 @@
     const q=(document.getElementById('filterInput')?.value||'').toLowerCase();
     const rows=Object.entries(map||{}).map(([tag,u])=>{
       const name=u?.name || [u?.first_name,u?.last_name].filter(Boolean).join(' ') || tag;
-      return { tag, name, org:u?.org_id||'' };
+      return { tag, name, org:u?.org_id||'', user: u };
     }).filter(r=>!q||r.name.toLowerCase().includes(q)||r.tag.toLowerCase().includes(q)||r.org.toLowerCase().includes(q))
       .sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
     if(!rows.length){ tbody.innerHTML=`<tr><td colspan="4" class="text-center text-muted">Inga användare.</td></tr>`; if(foot) foot.textContent=''; return; }
@@ -30,9 +30,34 @@
         <td>${esc(r.name)}</td>
         <td><code>${esc(r.tag)}</code></td>
         <td><code>${esc(r.org)}</code></td>
-        <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-del="${esc(r.tag)}" type="button">Ta bort</button></td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-primary" data-edit="${esc(r.tag)}" type="button"><i class="bi bi-pencil"></i> Redigera</button> <button class="btn btn-sm btn-outline-danger" data-del="${esc(r.tag)}" type="button"><i class="bi bi-trash"></i> Ta bort</button></td>
       </tr>`).join('');
     if(foot) foot.textContent=`Visar ${rows.length} användare.`;
+
+    // Handle edit button
+    document.querySelectorAll('#users-table button[data-edit]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const tag=btn.getAttribute('data-edit'); if(!tag) return;
+        const u = Object.entries(map||{}).find(([t])=> t===tag)?.[1];
+        if(!u) return;
+        // Populate form with user data
+        document.getElementById('firstName').value = u.first_name || '';
+        document.getElementById('lastName').value = u.last_name || '';
+        document.getElementById('rfidTag').value = tag;
+        document.getElementById('role').value = u.role || 'user';
+        document.getElementById('email').value = u.email || '';
+        document.getElementById('password').value = '';
+        document.getElementById('orgSelect').value = u.org_id || '';
+        document.getElementById('editingTag').value = tag;
+        // Update form state for editing
+        document.getElementById('btnSaveLabel').textContent = 'Uppdatera';
+        document.getElementById('btnCancel').classList.remove('d-none');
+        document.getElementById('rfidTag').disabled = true;
+        // Scroll to form
+        document.getElementById('add-user-form')?.scrollIntoView({behavior:'smooth'});
+      });
+    });
+
     document.querySelectorAll('#users-table button[data-del]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const tag=btn.getAttribute('data-del'); if(!tag) return;
@@ -59,9 +84,21 @@
     document.getElementById('filterInput')?.addEventListener('input', refresh);
 
     const form=document.getElementById('add-user-form');
+
+    // Cancel button handler
+    document.getElementById('btnCancel')?.addEventListener('click', ()=>{
+      form.reset();
+      form.classList.remove('was-validated');
+      document.getElementById('editingTag').value = '';
+      document.getElementById('btnSaveLabel').textContent = 'Spara';
+      document.getElementById('btnCancel').classList.add('d-none');
+      document.getElementById('rfidTag').disabled = false;
+    });
+
     document.getElementById('btnSaveUser')?.addEventListener('click', async (e)=>{
       e.preventDefault(); e.stopPropagation(); form.classList.add('was-validated');
       if(!form.checkValidity()) return;
+      const isEditing = document.getElementById('editingTag').value !== '';
       const role=normalizeRole(document.getElementById('role')?.value);
       const payload={
         tag: (document.getElementById('rfidTag')?.value||'').trim(),
@@ -74,9 +111,19 @@
         password: (document.getElementById('password')?.value||undefined)
       };
       if(!payload.org_id){ alertBox('Välj organisation.','warning'); return; }
-      try{ await postJSON(API.map, payload); bootstrap.Toast.getOrCreateInstance(document.getElementById('toast-stack')); }
+      try{
+        await postJSON(API.map, payload);
+        const action = isEditing ? 'uppdaterad' : 'sparad';
+        toast(`Användaren "${payload.name}" ${action}`,'success');
+        form.reset();
+        form.classList.remove('was-validated');
+        document.getElementById('editingTag').value = '';
+        document.getElementById('btnSaveLabel').textContent = 'Spara';
+        document.getElementById('btnCancel').classList.add('d-none');
+        document.getElementById('rfidTag').disabled = false;
+        await refresh();
+      }
       catch(e){ alertBox(`Kunde inte spara: ${e.message}`); return; }
-      form.reset(); form.classList.remove('was-validated'); await refresh();
     });
 
     await refresh();

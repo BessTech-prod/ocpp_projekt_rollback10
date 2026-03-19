@@ -36,10 +36,32 @@
         <td><code>${esc(cp)}</code></td>
         <td><code>${esc(org)}</code></td>
         <td class="text-end">
-          <button class="btn btn-sm btn-outline-danger" data-unassign="${esc(cp)}" type="button"><i class="bi bi-x-circle"></i> Ta bort</button>
+          <button class="btn btn-sm btn-outline-primary" data-edit="${esc(cp)}" type="button"><i class="bi bi-pencil"></i> Redigera</button>
+          <button class="btn btn-sm btn-outline-danger" data-unassign="${esc(cp)}" type="button"><i class="bi bi-trash"></i> Ta bort</button>
         </td>
       </tr>`).join('');
     tbody.innerHTML = rows || `<tr><td colspan="3" class="text-center text-muted">Ingen mappning ännu.</td></tr>`;
+
+    // Handle edit buttons
+    $$('#cps-table button[data-edit]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const cp=btn.getAttribute('data-edit');
+        if(!cp) return;
+        const org = Object.entries(map||{}).find(([c])=> c===cp)?.[1];
+        if(!org) return;
+        // Populate form with current data
+        $('#cpPick').value = cp;
+        $('#orgPick').value = org;
+        $('#editingCp').value = cp;
+        // Update form state for editing
+        $('#btnAssignLabel').textContent = 'Uppdatera';
+        $('#btnCancel').classList.remove('d-none');
+        $('#cpPick').disabled = true;
+        // Scroll to form
+        $('#cpPick')?.scrollIntoView({behavior:'smooth'});
+      });
+    });
+
     $$('#cps-table button[data-unassign]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const cp=btn.getAttribute('data-unassign');
@@ -69,11 +91,33 @@
     await initFormLists();
     await refresh();
 
+    // Cancel button handler
+    $('#btnCancel')?.addEventListener('click', ()=>{
+      $('#cpPick').value = '';
+      $('#orgPick').value = '';
+      $('#editingCp').value = '';
+      $('#btnAssignLabel').textContent = 'Tilldela';
+      $('#btnCancel').classList.add('d-none');
+      $('#cpPick').disabled = false;
+    });
+
     $('#btnAssign')?.addEventListener('click', async ()=>{
       const cp  = $('#cpPick')?.value || '';
       const org = $('#orgPick')?.value || '';
       if(!cp || !org){ alertBox('Välj både laddare och organisation.','warning'); return; }
-      try{ await postJSON(API.map, { cp_id: cp, org_id: org }); toast('Tilldelad.'); await refresh(); }
+      const isEditing = $('#editingCp').value !== '';
+      try{
+        await postJSON(API.map, { cp_id: cp, org_id: org });
+        const action = isEditing ? 'uppdaterad' : 'tilldelad';
+        toast(`Laddare ${action}.`);
+        $('#cpPick').value = '';
+        $('#orgPick').value = '';
+        $('#editingCp').value = '';
+        $('#btnAssignLabel').textContent = 'Tilldela';
+        $('#btnCancel').classList.add('d-none');
+        $('#cpPick').disabled = false;
+        await refresh();
+      }
       catch(e){ alertBox(`Kunde inte tilldela: ${e.message}`); }
     });
   });

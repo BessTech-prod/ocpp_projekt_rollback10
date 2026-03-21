@@ -29,7 +29,7 @@
   /* ------------------------------- HTTP ------------------------------------ */
   async function handle401(r) {
     if (r.status === 401) {
-      window.location.href = "/ui/login.html";
+      window.location.href = "/login.html";
       throw new Error("401 (redirect to login)");
     }
   }
@@ -81,19 +81,19 @@
     try{
       const me = await whoAmI();
       const role=(me.role||"").toLowerCase();
-      if (role==="portal_admin" || role==="admin") window.location.href="/ui/portal/index.html";
-      else if (role==="org_admin")                 window.location.href="/ui/org/index.html";
-      else                                         window.location.href="/ui/user/index.html";
-    }catch{ window.location.href="/ui/login.html"; }
+      if (role==="portal_admin" || role==="admin") window.location.href="/portal/index.html";
+      else if (role==="org_admin")                 window.location.href="/org/index.html";
+      else                                         window.location.href="/user/index.html";
+    }catch{ window.location.href="/login.html"; }
   };
   UI.requireRole = async function requireRole(allowedRoles){
     const me = await whoAmI();
     const role=(me.role||"").toLowerCase();
     const allowed=(allowedRoles||["user","org_admin","portal_admin","admin"]).map(s=>s.toLowerCase());
     if (!allowed.includes(role)){
-      if (role==="portal_admin" || role==="admin") window.location.href="/ui/portal/index.html";
-      else if (role==="org_admin")                 window.location.href="/ui/org/index.html";
-      else                                         window.location.href="/ui/user/index.html";
+      if (role==="portal_admin" || role==="admin") window.location.href="/portal/index.html";
+      else if (role==="org_admin")                 window.location.href="/org/index.html";
+      else                                         window.location.href="/user/index.html";
       return null;
     }
     return me;
@@ -111,7 +111,7 @@
     if (btnOut){
       btnOut.addEventListener("click", async ()=>{
         try{ await fetch("/api/auth/logout",{method:"POST"}); }catch{}
-        window.location.href="/ui/login.html";
+        window.location.href="/login.html";
       });
     }
     document.querySelectorAll("#navDashboard, .js-go-dashboard").forEach(el=>{

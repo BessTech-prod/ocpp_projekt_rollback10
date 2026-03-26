@@ -9,8 +9,10 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Dict, Optional
+from urllib.parse import urlsplit, parse_qs
 
 import websockets
 from ocpp.routing import on
@@ -19,6 +21,7 @@ from ocpp.v16.enums import Action, AuthorizationStatus, RegistrationStatus
 from ocpp.v16 import call_result, call
 
 from app.auth_store import AuthStore
+from app.history_export import enrich_transaction_snapshot
 from app.redis_config import build_redis_client
 
 # =====================================================================
@@ -31,6 +34,9 @@ logger = logging.getLogger("ocpp-ws")
 # KONFIGURATION
 # =====================================================================
 OCPP_PORT = int(os.getenv("OCPP_PORT", "9000"))
+CP_AUTOMAP_ON_CONNECT = os.getenv("CP_AUTOMAP_ON_CONNECT", "true").lower() in ("1", "true", "yes")
+CP_AUTH_REQUIRED = os.getenv("CP_AUTH_REQUIRED", "false").lower() in ("1", "true", "yes")
+CP_SHARED_TOKEN = os.getenv("CP_SHARED_TOKEN", "").strip()
 
 # File paths
 BASE = Path("/data")
@@ -39,6 +45,7 @@ USERS_FILE = BASE / "config" / "users.json"
 ORGS_FILE = BASE / "config" / "orgs.json"
 CPS_FILE = BASE / "config" / "cps.json"
 TRANSACTIONS_FILE = BASE / "transactions.json"
+RFIDS_FILE = BASE / "config" / "rfids.json"
 
 # =====================================================================
 # REDIS CLIENT
@@ -52,7 +59,25 @@ def result_key(command_id: str) -> str:
 
 
 def set_command_result(command_id: str, payload: dict):
-    redis_client.setex(result_key(command_id), 600, json.dumps(payload, ensure_ascii=False))
+    redis_client.setex(result_key(command_id), 600, json.dumps(make_json_safe(payload), ensure_ascii=False))
+
+
+def make_json_safe(value):
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, dict):
+        return {str(k): make_json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [make_json_safe(v) for v in value]
+    if hasattr(value, "model_dump"):
+        return make_json_safe(value.model_dump())
+    if hasattr(value, "dict"):
+        return make_json_safe(value.dict())
+    if hasattr(value, "__dict__"):
+        return make_json_safe({k: v for k, v in vars(value).items() if not k.startswith("_")})
+    return str(value)
 
 
 def build_ocpp_call(command: str, payload: dict):
@@ -74,6 +99,34 @@ def build_ocpp_call(command: str, payload: dict):
         if connector is None:
             return call.TriggerMessage(requested_message=requested_message)
         return call.TriggerMessage(requested_message=requested_message, connector_id=int(connector))
+
+    if command == "clear_cache":
+        return call.ClearCache()
+
+    if command == "unlock_connector":
+        connector_id = int(payload.get("connector_id", 1))
+        return call.UnlockConnector(connector_id=connector_id)
+
+    if command == "remote_start_transaction":
+        connector_id = payload.get("connector_id")
+        if connector_id in (None, ""):
+            return call.RemoteStartTransaction(id_tag=str(payload.get("id_tag", "")))
+        return call.RemoteStartTransaction(
+            id_tag=str(payload.get("id_tag", "")),
+            connector_id=int(connector_id),
+        )
+
+    if command == "remote_stop_transaction":
+        transaction_id = int(payload.get("transaction_id", 0))
+        return call.RemoteStopTransaction(transaction_id=transaction_id)
+
+    if command == "get_configuration":
+        keys = payload.get("key")
+        if not keys:
+            return call.GetConfiguration()
+        if isinstance(keys, str):
+            keys = [k.strip() for k in keys.split(",") if k.strip()]
+        return call.GetConfiguration(key=[str(k) for k in keys])
 
     raise ValueError(f"Unsupported command: {command}")
 
@@ -168,6 +221,46 @@ def load_json(path: Path, default):
     except Exception:
         return default
 
+def save_json(path: Path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+def normalize_tag(tag: str) -> str:
+    return (tag or "").strip().upper()
+
+def load_rfids_map() -> dict:
+    return load_json(RFIDS_FILE, {})
+
+def migrate_rfids_from_users_if_needed() -> int:
+    rfids = load_rfids_map()
+    users = load_json(USERS_FILE, {})
+    changed = 0
+    for tag, user in users.items():
+        ntag = normalize_tag(tag)
+        if not ntag:
+            continue
+        if ntag not in rfids:
+            rfids[ntag] = {
+                "alias": ntag,
+                "org_id": user.get("org_id") or "default",
+                "user_email": (user.get("email") or "").strip().lower() or None,
+                "active": True,
+                "updated_at": iso_now(),
+            }
+            changed += 1
+    if changed:
+        save_json(RFIDS_FILE, rfids)
+    return changed
+
+def find_user_by_email(users: dict, email: str) -> Optional[dict]:
+    wanted = (email or "").strip().lower()
+    if not wanted:
+        return None
+    for _, u in users.items():
+        if (u.get("email") or "").strip().lower() == wanted:
+            return u
+    return None
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
@@ -181,7 +274,10 @@ def ensure_default_org():
 def org_for_cp(cp_id: str) -> str:
     """Returnera CP-org (om saknas → 'default')."""
     cps = load_json(CPS_FILE, {})
-    return cps.get(cp_id, "default")
+    entry = cps.get(cp_id)
+    if isinstance(entry, dict):
+        return (entry.get("org_id") or "default").strip() or "default"
+    return (entry or "default").strip() if isinstance(entry, str) else "default"
 
 def is_tag_allowed_on_cp(tag: str, cp_id: str) -> bool:
     """
@@ -190,13 +286,30 @@ def is_tag_allowed_on_cp(tag: str, cp_id: str) -> bool:
     - CP måste tillhöra samma org som användarens org
     - Om PORTAL_TAGS_GLOBAL=true → portal_admin alltid accepterad
     """
+    tag = normalize_tag(tag)
     users = load_json(USERS_FILE, {})
-    u = users.get(tag)
-    if not u:
-        return False
+    rfids = load_rfids_map()
 
-    tag_role = (u.get("role") or "user").lower()
-    tag_org = u.get("org_id")
+    rfid = rfids.get(tag)
+    if rfid is not None:
+        if not bool(rfid.get("active", True)):
+            return False
+        user_email = (rfid.get("user_email") or "").strip().lower()
+        if not user_email:
+            return False
+        u = find_user_by_email(users, user_email)
+        if not u:
+            return False
+        tag_role = (u.get("role") or "user").lower()
+        tag_org = rfid.get("org_id") or u.get("org_id")
+    else:
+        # Legacy fallback: users keyed by RFID tag
+        u = users.get(tag)
+        if not u:
+            return False
+        tag_role = (u.get("role") or "user").lower()
+        tag_org = u.get("org_id")
+
     cp_org = org_for_cp(cp_id)
 
     # Portal-admin override
@@ -246,7 +359,8 @@ class CentralSystemCP(CP):
         allowed = auth_store.contains(id_tag)
         ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
         status = AuthorizationStatus.accepted if ok else AuthorizationStatus.blocked
-        logger.info("[%s] Authorize id_tag=%s -> %s", self.id, id_tag, status.value)
+        masked_tag = (normalize_tag(id_tag)[:4] + "***") if normalize_tag(id_tag) else "***"
+        logger.info("[%s] Authorize id_tag=%s -> %s", self.id, masked_tag, status.value)
         return call_result.Authorize(id_tag_info={"status": status})
 
     @on(Action.start_transaction)
@@ -259,16 +373,29 @@ class CentralSystemCP(CP):
         ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
         status = AuthorizationStatus.accepted if ok else AuthorizationStatus.blocked
 
+        rfids = load_rfids_map()
+        rfid = rfids.get(normalize_tag(id_tag), {})
+
         entry = {
             "transaction_id": tx_id,
             "charge_point": self.id,
             "connectorId": int(connector_id),
             "id_tag": id_tag,
+            "tag_alias": rfid.get("alias") or normalize_tag(id_tag),
+            "user_email": rfid.get("user_email"),
             "start_time": timestamp,
             "meter_start": meter_start,
             "stop_time": None,
             "meter_stop": None
         }
+
+        entry = enrich_transaction_snapshot(
+            entry,
+            rfids_map=rfids,
+            cps_map=load_json(CPS_FILE, {}),
+            users_map=load_json(USERS_FILE, {}),
+            orgs_map=load_json(ORGS_FILE, {}),
+        )
 
         # Store in Redis for active transactions
         tx_key = f"open_tx:{tx_id}"
@@ -319,16 +446,39 @@ class CentralSystemCP(CP):
 
 
 async def on_connect(websocket, path):
-    cp_id = path.strip("/")
+    parsed = urlsplit(path)
+    cp_id = parsed.path.strip("/")
+    token = (parse_qs(parsed.query).get("token", [""])[0] or "").strip()
+
+    if not cp_id:
+        logger.warning("Rejected CP connection with empty charge point id")
+        await websocket.close(code=1008, reason="Missing ChargeBoxId")
+        return
+
+    if CP_AUTH_REQUIRED:
+        cps = load_json(CPS_FILE, {})
+        known_cp = cp_id in cps
+        if not known_cp:
+            logger.warning("Rejected CP '%s' (unknown charge point id)", cp_id)
+            await websocket.close(code=1008, reason="Unknown ChargeBoxId")
+            return
+        if CP_SHARED_TOKEN and token != CP_SHARED_TOKEN:
+            logger.warning("Rejected CP '%s' (invalid token)", cp_id)
+            await websocket.close(code=1008, reason="Invalid token")
+            return
+
     logger.info("CP connected: %s", cp_id)
 
-    # Auto-map to default org if not mapped
-    ensure_default_org()
-    cps = load_json(CPS_FILE, {})
-    if cp_id not in cps:
-        cps[cp_id] = "default"
-        CPS_FILE.write_text(json.dumps(cps, indent=2, ensure_ascii=False), encoding="utf-8")
-        logger.info("CP '%s' automapped to org 'default'", cp_id)
+    # Optional auto-map: disable in local test mode to keep CPs unassigned.
+    if CP_AUTOMAP_ON_CONNECT:
+        ensure_default_org()
+        cps = load_json(CPS_FILE, {})
+        if cp_id not in cps:
+            cps[cp_id] = {"org_id": "default", "alias": cp_id}
+            CPS_FILE.write_text(json.dumps(cps, indent=2, ensure_ascii=False), encoding="utf-8")
+            logger.info("CP '%s' automapped to org 'default'", cp_id)
+    else:
+        logger.info("CP '%s' connected without automap (CP_AUTOMAP_ON_CONNECT=false)", cp_id)
 
     # Track connected CP in Redis
     redis_client.sadd("connected_cps", cp_id)
@@ -346,6 +496,9 @@ async def on_connect(websocket, path):
 async def main():
     await wait_for_redis()
     ensure_default_org()
+    migrated = migrate_rfids_from_users_if_needed()
+    if migrated:
+        logger.info("RFID-migrering: skapade %s poster från users.json", migrated)
     logger.info("Starting OCPP WebSocket server on port %d", OCPP_PORT)
     server = await websockets.serve(
         on_connect,

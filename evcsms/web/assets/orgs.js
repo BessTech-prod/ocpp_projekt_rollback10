@@ -45,11 +45,26 @@
 
   document.addEventListener('DOMContentLoaded', async ()=>{
     const me = await UI.initPage({ requiredRoles:['portal_admin','admin'] }); if(!me) return;
-    document.getElementById('btnCreate')?.addEventListener('click', async ()=>{
-      const id=document.getElementById('newOrgId')?.value.trim(); const name=document.getElementById('newOrgName')?.value.trim();
+    // Show modal on button click
+    document.getElementById('btnShowCreateOrgModal')?.addEventListener('click', ()=>{
+      const modal = new bootstrap.Modal(document.getElementById('createOrgModal'));
+      document.getElementById('modalOrgId').value = '';
+      document.getElementById('modalOrgName').value = '';
+      modal.show();
+    });
+    // Handle create in modal
+    document.getElementById('btnModalCreate')?.addEventListener('click', async ()=>{
+      const id = document.getElementById('modalOrgId')?.value.trim();
+      const name = document.getElementById('modalOrgName')?.value.trim();
       if(!id||!name){ alertBox('Fyll i org-id och namn.','warning'); return; }
-      try{ await postJSON(API.orgs, { org_id:id, name }); toast('Organisation skapad'); document.getElementById('newOrgId').value=''; document.getElementById('newOrgName').value=''; await refresh(); }
-      catch(e){ alertBox(`Kunde inte skapa: ${e.message}`); }
+      try {
+        await postJSON(API.orgs, { org_id:id, name });
+        toast('Organisation skapad');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('createOrgModal')).hide();
+        await refresh();
+      } catch(e) {
+        alertBox(`Kunde inte skapa: ${e.message}`);
+      }
     });
     await refresh();
   });

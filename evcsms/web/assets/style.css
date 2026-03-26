@@ -150,12 +150,13 @@ a:hover, .btn-link:hover {
 }
 
 .table-panel {
-  padding: .5rem .5rem 0;
+  padding: 0;
   overflow: hidden;
 }
 
 .table-panel .table {
-  margin-bottom: .5rem;
+  margin-bottom: 0;
+  width: 100%;
 }
 
 .status-legend-panel {
@@ -198,13 +199,61 @@ a:hover, .btn-link:hover {
   margin-top: 1rem;
 }
 
-.table thead.table-dark {
+.table thead.table-dark,
+.import-result-header {
   background: linear-gradient(135deg, rgba(163, 0, 96, .92) 0%, rgba(48, 23, 96, .96) 100%);
 }
 
-.table thead.table-dark th {
-  background: transparent;
+.table-panel .table thead.table-dark th {
+  background: transparent !important;
+  --bs-table-bg: transparent !important;
+  --bs-table-accent-bg: transparent !important;
   border: 0;
+  color: #fff;
+  font-weight: 600;
+  font-size: .8125rem;
+  padding: .55rem .75rem;
+  vertical-align: middle;
+}
+
+.table-panel .table thead.table-dark th:first-child {
+  padding-left: 1rem;
+}
+
+.table-panel .table thead.table-dark th:last-child {
+  padding-right: 1rem;
+}
+
+.table-panel .table tbody td {
+  padding: .65rem .75rem;
+  vertical-align: middle;
+}
+
+.table-panel .table tbody td:first-child {
+  padding-left: 1rem;
+}
+
+.table-panel .table tbody td:last-child {
+  padding-right: 1rem;
+}
+
+/* Standalone solid header bar for import result tables.
+   Completely decoupled from the table's column rendering so the
+   gradient always covers 100 % of the container width. */
+.import-result-header {
+  display: grid;
+  width: 100%;
+  color: #fff;
+  font-weight: 600;
+  font-size: .8125rem;
+  border-radius: 1.1rem 1.1rem 0 0;
+}
+
+.import-result-header > span {
+  padding: .35rem .5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .form-control,
@@ -224,6 +273,54 @@ a:hover, .btn-link:hover {
   border-color: rgba(163, 0, 96, .12);
 }
 
+.org-create-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  width: min(100%, 860px);
+}
+
+.org-create-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: .45rem .75rem;
+  border-radius: .8rem;
+  border: 1px solid var(--bs-border-color);
+  background: #f8fafc;
+  white-space: nowrap;
+}
+
+.org-create-row .org-create-id {
+  flex: 1 1 200px;
+  min-width: 180px;
+}
+
+.org-create-row .org-create-name {
+  flex: 2 1 300px;
+  min-width: 230px;
+}
+
+.org-create-row .btn {
+  min-height: 2.75rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .org-create-row {
+    width: 100%;
+  }
+
+  .org-create-label,
+  .org-create-row .org-create-id,
+  .org-create-row .org-create-name,
+  .org-create-row .btn {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 /* Badges tweak */
 .badge.bg-warning { color: #111827 !important; }
 .badge.bg-info    { color: #0b1220 !important; }
@@ -234,6 +331,12 @@ a:hover, .btn-link:hover {
 }
 .spinner-inline {
   width: 1rem; height: 1rem; border-width: .15rem;
+}
+
+.ocpp-send-btn {
+  width: 190px;
+  min-height: 2.5rem;
+  white-space: nowrap;
 }
 
 /* Toast container placering */

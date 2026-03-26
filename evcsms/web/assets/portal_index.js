@@ -1,5 +1,6 @@
 // /assets/portal_index.js  (org_filter_1)
 (function(){
+  const POLL_MS = 5000;
   const API = {
     me:     '/api/auth/me',
     cps:    '/api/cps',
@@ -16,26 +17,6 @@
     if(t>0) setTimeout(()=> el.innerHTML='', t);
   }
   function displayCpId(id){ try{ return String(id||'').split('/').pop()||String(id||''); }catch{ return String(id||''); } }
-  function statusClass(s){
-    const v=(s||'').toLowerCase();
-    if(v==='charging')return'badge status-charging';
-    if(v==='available')return'badge status-available';
-    if(v==='preparing'||v==='finishing')return'badge status-preparing';
-    if(v==='suspendedev'||v==='suspendedevse'||v==='suspended')return'badge status-suspended';
-    if(v==='faulted')return'badge status-faulted';
-    if(v==='unavailable')return'badge status-unavailable';
-    return'badge status-unknown';
-  }
-
-  function cpState(cpStatus){
-    const s1 = (cpStatus?.[1]?.status || '').toLowerCase();
-    const s2 = (cpStatus?.[2]?.status || '').toLowerCase();
-    const all = [s1, s2];
-    if (all.includes('charging')) return 'charging';
-    if (all.includes('faulted')) return 'faulted';
-    if (all.includes('available')) return 'available';
-    return 'other';
-  }
 
   function renderStatusCards(cps, statusData){
     const host = $('#cp-status-cards');
@@ -43,19 +24,33 @@
 
     const counters = { charging: 0, available: 0, faulted: 0 };
     cps.forEach(cpId => {
-      const bucket = cpState(statusData[cpId] || {});
-      if (bucket in counters) counters[bucket] += 1;
+      const cpStatus = statusData[cpId] || {};
+      Object.entries(cpStatus).forEach(([connectorId, connector]) => {
+        // Connector 0 is CP-level state and should not be shown as an outlet.
+        const numId = Number(connectorId);
+        if (!Number.isFinite(numId) || numId <= 0) return;
+        const bucket = UI.normalizeChargerStatus(connector?.status);
+        if (bucket in counters) counters[bucket] += 1;
+      });
     });
 
     host.innerHTML = `
-      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Ledig</div><div class="h3 m-0">${counters.available}</div></div></div></div>
-      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Laddar</div><div class="h3 m-0">${counters.charging}</div></div></div></div>
-      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Ur drift</div><div class="h3 m-0">${counters.faulted}</div></div></div></div>`;
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Lediga uttag</div><div class="h3 m-0">${counters.available}</div></div></div></div>
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Laddar nu</div><div class="h3 m-0">${counters.charging}</div></div></div></div>
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Uttag ur drift</div><div class="h3 m-0">${counters.faulted}</div></div></div></div>`;
   }
 
   // ------- Org-filter (endast portal_admin/admin) -------
   let ROLE = null;
-  let CPS_ASSIGN = {}; // {cp_id -> org_id}
+  let CPS_ASSIGN = {}; // {cp_id -> {org_id, alias}}
+      function cpMeta(cpId){
+        const row = CPS_ASSIGN?.[cpId];
+        if (row && typeof row === 'object') {
+          return { org_id: row.org_id || '', alias: row.alias || cpId };
+        }
+        return { org_id: row || '', alias: cpId };
+      }
+
   let LAST_CPS = [];   // snapshot från API
   let LAST_STATUS = {};
 
@@ -100,7 +95,7 @@
     let visible = cps.slice();
     const selectedOrg = ($('#orgFilter')?.value || '');
     if((ROLE==='portal_admin'||ROLE==='admin') && selectedOrg){
-      visible = visible.filter(cp => (CPS_ASSIGN[cp] || '') === selectedOrg);
+      visible = visible.filter(cp => (cpMeta(cp).org_id || '') === selectedOrg);
     }
 
     renderStatusCards(visible, statusData);
@@ -112,6 +107,7 @@
 
     visible.forEach(cpId=>{
       const cpStat = statusData[cpId] || {};
+      const meta = cpMeta(cpId);
       const c1 = cpStat[1];
       const c2 = cpStat[2];
 
@@ -121,16 +117,17 @@
         <div class="card border-0 shadow-sm h-100">
           <div class="card-body">
             <h5 class="card-title d-flex align-items-center gap-2">
-              <i class="bi bi-ev-front"></i> ${displayCpId(cpId)}
-              ${(ROLE==='portal_admin'||ROLE==='admin') && CPS_ASSIGN[cpId] ? `<span class="badge text-bg-secondary ms-auto">${CPS_ASSIGN[cpId]}</span>` : ''}
+              <i class="bi bi-ev-front"></i> ${meta.alias || displayCpId(cpId)}
+              ${(ROLE==='portal_admin'||ROLE==='admin') && meta.org_id ? `<span class="badge text-bg-secondary ms-auto">${meta.org_id}</span>` : ''}
             </h5>
+            <div class="small text-muted mb-2">ID: ${cpId}</div>
             <div class="mb-2">
               <strong>Uttag 1:</strong>
-              <span class="${statusClass(c1?.status)}">${c1?.status || 'Ingen data'}</span>
+              <span class="${UI.statusClass(c1?.status)}">${UI.statusLabelSv(c1?.status)}</span>
             </div>
             <div>
               <strong>Uttag 2:</strong>
-              <span class="${statusClass(c2?.status)}">${c2?.status || 'Ingen data'}</span>
+              <span class="${UI.statusClass(c2?.status)}">${UI.statusLabelSv(c2?.status)}</span>
             </div>
           </div>
         </div>`;
@@ -167,11 +164,11 @@
 
     await initOrgFilterIfPortal();
     await tick();
-    timer = setInterval(tick, 2000);
+    timer = setInterval(tick, POLL_MS);
 
     document.addEventListener('visibilitychange', ()=>{
       if (document.hidden) { if (timer) { clearInterval(timer); timer = null; } }
-      else { if (!timer) { tick(); timer = setInterval(tick, 2000); } }
+      else { if (!timer) { tick(); timer = setInterval(tick, POLL_MS); } }
     });
   });
 })();

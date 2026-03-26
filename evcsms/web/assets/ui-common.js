@@ -75,6 +75,46 @@
     try { new bootstrap.Toast(document.getElementById(id), { delay: 2200 }).show(); } catch {}
   };
 
+  /* ----------------------- LADDSTATUS (OCPP -> SV) ------------------------- */
+  UI.normalizeChargerStatus = function normalizeChargerStatus(raw){
+    const v = String(raw || '').trim().toLowerCase();
+    if (!v) return 'no_data';
+    if (v === 'charging') return 'charging';
+    if (v === 'available') return 'available';
+    if (v === 'preparing') return 'preparing';
+    if (v === 'finishing') return 'finishing';
+    if (v === 'faulted') return 'faulted';
+    if (v === 'unavailable') return 'unavailable';
+    if (v === 'reserved') return 'reserved';
+    if (v === 'suspendedev' || v === 'suspendedevse' || v === 'suspended') return 'suspended';
+    return 'unknown';
+  };
+
+  UI.statusLabelSv = function statusLabelSv(raw){
+    const k = UI.normalizeChargerStatus(raw);
+    if (k === 'charging') return 'Laddar';
+    if (k === 'available') return 'Ledig';
+    if (k === 'preparing') return 'Förbereder';
+    if (k === 'finishing') return 'Avslutar';
+    if (k === 'faulted') return 'Ur drift';
+    if (k === 'unavailable') return 'Otillgänglig';
+    if (k === 'reserved') return 'Reserverad';
+    if (k === 'suspended') return 'Pausad';
+    if (k === 'no_data') return 'Ingen data';
+    return 'Okänd';
+  };
+
+  UI.statusClass = function statusClass(raw){
+    const k = UI.normalizeChargerStatus(raw);
+    if (k === 'charging') return 'badge status-charging';
+    if (k === 'available') return 'badge status-available';
+    if (k === 'preparing' || k === 'finishing') return 'badge status-preparing';
+    if (k === 'suspended') return 'badge status-suspended';
+    if (k === 'faulted') return 'badge status-faulted';
+    if (k === 'unavailable') return 'badge status-unavailable';
+    return 'badge status-unknown';
+  };
+
   /* ------------------------------ AUTH/ROLL -------------------------------- */
   async function whoAmI(){ return UI.getJSON("/api/auth/me"); }
   UI.goToDashboard = async function goToDashboard(){

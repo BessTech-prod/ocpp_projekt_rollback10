@@ -20,7 +20,9 @@ def build_redis_client() -> redis.Redis:
     host = os.getenv("REDIS_HOST", "redis-service")
     port = int(os.getenv("REDIS_PORT", "6379"))
     db = int(os.getenv("REDIS_DB", "0"))
-    password = os.getenv("REDIS_PASSWORD")
+    password = (os.getenv("REDIS_PASSWORD") or "").strip()
+    if not password:
+        raise RuntimeError("REDIS_PASSWORD must be set when REDIS_URL is not used")
 
     return redis.Redis(host=host, port=port, db=db, password=password)
 

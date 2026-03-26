@@ -1,4 +1,5 @@
 (function(){
+  const POLL_MS = 5000;
   const API = {
     orgs: '/api/orgs',
     live: '/api/portal/live/chargers',
@@ -18,21 +19,55 @@
     statusTimer: null,
   };
 
+  const COMMAND_CONFIG = {
+    reset: {
+      argLabel: 'Reset-typ',
+      args: ['Hard', 'Soft'],
+      showConnector: false,
+    },
+    change_availability: {
+      argLabel: 'Tillgänglighet',
+      args: ['Operative', 'Inoperative'],
+      showConnector: true,
+    },
+    trigger_message: {
+      argLabel: 'Meddelande',
+      args: ['StatusNotification', 'Heartbeat', 'BootNotification', 'MeterValues', 'FirmwareStatusNotification', 'DiagnosticsStatusNotification'],
+      showConnector: true,
+    },
+    clear_cache: {
+      showConnector: false,
+    },
+    unlock_connector: {
+      showConnector: true,
+    },
+    remote_start_transaction: {
+      showConnector: true,
+      showIdTag: true,
+    },
+    remote_stop_transaction: {
+      showConnector: true,
+    },
+    get_configuration: {
+      showConfigKeys: true,
+    },
+  };
+
+  const GET_CONFIGURATION_OPTIONS = [
+    { value: '__all__', label: 'Alla nycklar' },
+    { value: 'HeartbeatInterval', label: 'HeartbeatInterval' },
+    { value: 'AuthorizeRemoteTxRequests', label: 'AuthorizeRemoteTxRequests' },
+    { value: 'ConnectionTimeOut', label: 'ConnectionTimeOut' },
+  ];
+
   function esc(v){
     return String(v ?? '').replace(/[&<>"']/g, (c)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   }
 
   function statusBadge(raw){
-    const v = String(raw || 'Ingen data');
-    const s = v.toLowerCase();
-    let cls = 'badge status-unknown';
-    if (s === 'charging') cls = 'badge status-charging';
-    else if (s === 'available') cls = 'badge status-available';
-    else if (s === 'preparing' || s === 'finishing') cls = 'badge status-preparing';
-    else if (s === 'faulted') cls = 'badge status-faulted';
-    else if (s === 'unavailable') cls = 'badge status-unavailable';
-    else if (s === 'suspendedev' || s === 'suspendedevse' || s === 'suspended') cls = 'badge status-suspended';
-    return `<span class="${cls}">${esc(v)}</span>`;
+    const cls = UI.statusClass(raw);
+    const label = UI.statusLabelSv(raw);
+    return `<span class="${cls}">${esc(label)}</span>`;
   }
 
   async function fetchLiveFallback(orgId){
@@ -43,7 +78,8 @@
 
     const items = Object.keys(statusMap || {}).sort().map((cpId) => ({
       cp_id: cpId,
-      org_id: (cpsMap && cpsMap[cpId]) || 'default',
+      alias: (cpsMap && cpsMap[cpId] && typeof cpsMap[cpId] === 'object' ? cpsMap[cpId].alias : cpId) || cpId,
+      org_id: (cpsMap && cpsMap[cpId] && typeof cpsMap[cpId] === 'object' ? cpsMap[cpId].org_id : cpsMap?.[cpId]) || 'default',
       status: (statusMap && statusMap[cpId]) || {},
     }));
 
@@ -89,12 +125,12 @@
     }
 
     tbody.innerHTML = state.items.map((it)=>{
-      const c1 = it.status?.[1]?.status || 'Ingen data';
-      const c2 = it.status?.[2]?.status || 'Ingen data';
+      const c1 = it.status?.[1]?.status;
+      const c2 = it.status?.[2]?.status;
       const ts = it.status?.[1]?.timestamp || it.status?.[2]?.timestamp || '-';
       const orgName = state.orgs[it.org_id]?.name || it.org_id || 'default';
       return `<tr>
-        <td>${esc(it.cp_id)}</td>
+        <td>${esc(it.alias || it.cp_id)} <span class="text-muted">(${esc(it.cp_id)})</span></td>
         <td>${esc(orgName)} <span class="text-muted">(${esc(it.org_id || 'default')})</span></td>
         <td>${statusBadge(c1)}</td>
         <td>${statusBadge(c2)}</td>
@@ -107,7 +143,7 @@
     const sel = $('#cpPick');
     if (!sel) return;
     const current = sel.value;
-    sel.innerHTML = state.items.map((it)=>`<option value="${esc(it.cp_id)}">${esc(it.cp_id)} (${esc(it.org_id || 'default')})</option>`).join('');
+    sel.innerHTML = state.items.map((it)=>`<option value="${esc(it.cp_id)}">${esc(it.alias || it.cp_id)} (${esc(it.cp_id)})</option>`).join('');
     if (!state.items.length){
       sel.innerHTML = '<option value="">Ingen laddare tillgänglig</option>';
       sel.disabled = true;
@@ -117,20 +153,64 @@
     if (current && state.items.some((it)=>it.cp_id === current)) sel.value = current;
   }
 
+  function findCp(cpId){
+    return (state.items || []).find((it)=>it.cp_id === cpId) || null;
+  }
+
+  function cpDisplayName(cpId){
+    const cp = findCp(cpId);
+    if (!cp) return cpId || 'okänd laddare';
+    return `${cp.alias || cp.cp_id} (${cp.cp_id})`;
+  }
+
+  function confirmDangerousCommand(command, cpId, payload){
+    if (command === 'reset'){
+      const resetType = payload?.type || 'Hard';
+      const warning = resetType === 'Hard'
+        ? 'Detta kan avbryta pågående laddning och starta om laddaren direkt.'
+        : 'Detta startar om laddaren mjukt och kan påverka pågående sessioner.';
+      return window.confirm(
+        `Bekräfta ${resetType}-reset för ${cpDisplayName(cpId)}.\n\n${warning}\n\nVill du fortsätta?`
+      );
+    }
+
+    return true;
+  }
+
+  function toggleField(id, visible){
+    const el = $(id);
+    if (!el) return;
+    el.classList.toggle('d-none', !visible);
+  }
+
   function setCommandOptions(){
     const command = ($('#commandPick')?.value || 'reset');
+    const cfg = COMMAND_CONFIG[command] || {};
     const arg = $('#commandArg');
-    if (!arg) return;
+    const argLabel = $('label[for="commandArg"]');
+    if (arg && cfg.args?.length){
+      arg.innerHTML = cfg.args.map((v)=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    } else if (arg) {
+      arg.innerHTML = '';
+    }
 
-    if (command === 'reset'){
-      arg.innerHTML = '<option value="Hard">Hard</option><option value="Soft">Soft</option>';
-      return;
+    if (argLabel) argLabel.textContent = cfg.argLabel || 'Parameter';
+
+    toggleField('#commandArgWrap', !!cfg.args?.length);
+    toggleField('#connectorWrap', !!cfg.showConnector);
+    toggleField('#idTagWrap', !!cfg.showIdTag);
+    toggleField('#configKeyWrap', !!cfg.showConfigKeys);
+
+    const cfgSelect = $('#configKeySelect');
+    if (cfgSelect && cfg.showConfigKeys) {
+      const current = cfgSelect.value || '__all__';
+      cfgSelect.innerHTML = GET_CONFIGURATION_OPTIONS
+        .map((opt)=>`<option value="${esc(opt.value)}">${esc(opt.label)}</option>`)
+        .join('');
+      cfgSelect.value = GET_CONFIGURATION_OPTIONS.some((opt)=>opt.value === current) ? current : '__all__';
     }
-    if (command === 'change_availability'){
-      arg.innerHTML = '<option value="Operative">Operative</option><option value="Inoperative">Inoperative</option>';
-      return;
-    }
-    arg.innerHTML = '<option value="StatusNotification">StatusNotification</option><option value="Heartbeat">Heartbeat</option><option value="BootNotification">BootNotification</option>';
+
+    // Keep button slot fixed for consistent layout/UX.
   }
 
   async function pollCommandResult(commandId){
@@ -143,7 +223,10 @@
       try {
         const data = await UI.getJSON(API.commandStatus(commandId));
         if (statusEl){
-          if (data.status === 'success') statusEl.textContent = `Kommando klart (${data.command}) kl ${new Date().toLocaleTimeString()}`;
+          if (data.status === 'success') {
+            const details = data.response ? ` → ${JSON.stringify(data.response)}` : '';
+            statusEl.textContent = `Kommando klart (${data.command}) kl ${new Date().toLocaleTimeString()}${details}`;
+          }
           else if (data.status === 'failed') statusEl.textContent = `Kommando misslyckades: ${data.error || 'okänt fel'}`;
           else statusEl.textContent = `Kommando köat (${data.command})...`;
         }
@@ -165,8 +248,9 @@
     const cpId = ($('#cpPick')?.value || '').trim();
     const command = ($('#commandPick')?.value || '').trim();
     const arg = ($('#commandArg')?.value || '').trim();
-    const connectorRaw = ($('#connectorId')?.value || '1');
-    const connectorId = Number(connectorRaw);
+    const connectorValue = ($('#connectorId')?.value || '').trim();
+    const idTag = ($('#idTagInput')?.value || '').trim().toUpperCase();
+    const configKeyValue = ($('#configKeySelect')?.value || '__all__').trim();
     const btn = $('#btnSendCommand');
     const statusEl = $('#commandStatus');
 
@@ -176,13 +260,37 @@
     }
 
     const payload = {};
-    if (command === 'reset') payload.type = arg || 'Hard';
-    else if (command === 'change_availability'){
+    if (command === 'reset') {
+      payload.type = arg || 'Hard';
+    } else if (command === 'change_availability') {
       payload.type = arg || 'Operative';
-      payload.connector_id = connectorId;
-    } else {
+      payload.connector_id = Number(connectorValue || '0');
+    } else if (command === 'trigger_message') {
       payload.requested_message = arg || 'StatusNotification';
+      if (connectorValue !== '') payload.connector_id = Number(connectorValue);
+    } else if (command === 'unlock_connector') {
+      payload.connector_id = Number(connectorValue || '1');
+    } else if (command === 'remote_start_transaction') {
+      if (!idTag) {
+        UI.alert('Ange RFID / idTag för RemoteStartTransaction.');
+        return;
+      }
+      payload.id_tag = idTag;
+      if (connectorValue !== '') payload.connector_id = Number(connectorValue);
+    } else if (command === 'remote_stop_transaction') {
+      const connectorId = Number(connectorValue || '0');
+      if (!Number.isFinite(connectorId) || connectorId < 1) {
+        UI.alert('Välj ett giltigt uttag för RemoteStopTransaction.');
+        return;
+      }
       payload.connector_id = connectorId;
+    } else if (command === 'get_configuration') {
+      if (configKeyValue && configKeyValue !== '__all__') payload.key = configKeyValue;
+    }
+
+    if (!confirmDangerousCommand(command, cpId, payload)){
+      if (statusEl) statusEl.textContent = 'Kommando avbrutet.';
+      return;
     }
 
     try {
@@ -217,7 +325,7 @@
     setCommandOptions();
 
     // Start the timer first so the page keeps polling even if the first request fails
-    state.timer = setInterval(fetchLive, 2000);
+    state.timer = setInterval(fetchLive, POLL_MS);
     await fetchLive();
 
     document.addEventListener('visibilitychange', ()=>{
@@ -226,7 +334,7 @@
         state.timer = null;
       } else if (!document.hidden && !state.timer){
         fetchLive();
-        state.timer = setInterval(fetchLive, 2000);
+        state.timer = setInterval(fetchLive, POLL_MS);
       }
     });
   }

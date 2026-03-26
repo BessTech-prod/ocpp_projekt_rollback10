@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# EV CSMS - Microservices Runner
-# This script helps run the microservices architecture locally
+# EV CSMS - Deployment Runner
+# Supported mode: multi-service Docker Compose stack
 
 set -e
 
@@ -30,18 +30,18 @@ else
     exit 1
 fi
 
-COMPOSE_MICRO="${COMPOSE_CMD} -f docker-compose.yml"
-COMPOSE_SINGLE="${COMPOSE_CMD} -f docker-compose.single.yml"
+ENV_FILE=".env"
+if [ ! -f "$ENV_FILE" ] && [ -f ".env.demo" ]; then
+    ENV_FILE=".env.demo"
+fi
+
+COMPOSE_STACK="${COMPOSE_CMD} --env-file ${ENV_FILE} -f docker-compose.yml"
 
 # Function to show usage
 show_usage() {
     echo "Usage: $0 [command]"
     echo ""
     echo "Commands:"
-    echo "  up-local    Start single-container localhost mode"
-    echo "  down-local  Stop single-container localhost mode"
-    echo "  logs-local  Show logs for single-container localhost mode"
-    echo "  build-local Build single-container localhost image"
     echo "  up          Start all services"
     echo "  down        Stop all services"
     echo "  build       Build all services"
@@ -51,97 +51,68 @@ show_usage() {
     echo "  kill        Stop and remove all containers without removing volumes"
     echo ""
     echo "Examples:"
-    echo "  $0 up-local     # Start one-container localhost mode"
-    echo "  $0 up          # Start the entire stack"
+    echo "  $0 up          # Start the localhost demo stack"
+    echo "  $0 seed-demo   # Recreate demo sessions and demo users"
     echo "  $0 logs api    # Show logs for API service only"
 }
 
 # Main logic
 case "${1:-up}" in
-    "up-local")
-        echo -e "${YELLOW}Starting single-container localhost mode...${NC}"
-        ${COMPOSE_SINGLE} up -d --build
-        echo -e "${GREEN}Local single-container mode started!${NC}"
-        echo ""
-        echo "Access URLs:"
-        echo "  Web UI:     http://localhost/"
-        echo "  API Docs:   http://localhost/docs"
-        echo "  API:        http://localhost:8000"
-        echo "  OCPP WS:    ws://localhost:9000"
-        echo ""
-        echo "To view logs: $0 logs-local"
-        echo "To stop:      $0 down-local"
-        ;;
-
-    "down-local")
-        echo -e "${YELLOW}Stopping single-container localhost mode...${NC}"
-        ${COMPOSE_SINGLE} down
-        echo -e "${GREEN}Single-container localhost mode stopped.${NC}"
-        ;;
-
-    "logs-local")
-        ${COMPOSE_SINGLE} logs -f
-        ;;
-
-    "build-local")
-        echo -e "${YELLOW}Building single-container localhost image...${NC}"
-        ${COMPOSE_SINGLE} build --no-cache
-        echo -e "${GREEN}Local image build complete.${NC}"
-        ;;
-
     "up")
         echo -e "${YELLOW}Starting all services...${NC}"
-        ${COMPOSE_MICRO} up -d
+        echo "Using env file: ${ENV_FILE}"
+        ${COMPOSE_STACK} up -d --remove-orphans
         echo -e "${GREEN}Services started!${NC}"
         echo ""
         echo "Access URLs:"
-        echo "  Web UI:     http://localhost/"
+        echo "  UI:         http://localhost:8080"
         echo "  API:        http://localhost:8000"
         echo "  OCPP WS:    ws://localhost:9000"
-        echo "  Redis:      localhost:6379"
+        echo "  Health:     http://localhost:8080/health"
         echo ""
+        # Demo logins removed for production
         echo "To view logs: $0 logs"
         echo "To stop:      $0 down"
         ;;
 
+    # seed-demo command removed for production
+
     "down")
         echo -e "${YELLOW}Stopping all services...${NC}"
-        ${COMPOSE_MICRO} down
+        ${COMPOSE_STACK} down --remove-orphans
         echo -e "${GREEN}Services stopped.${NC}"
         ;;
 
     "build")
         echo -e "${YELLOW}Building all services...${NC}"
-        ${COMPOSE_MICRO} build --no-cache
+        ${COMPOSE_STACK} build --no-cache
         echo -e "${GREEN}Build complete.${NC}"
         ;;
 
     "logs")
         if [ -n "$2" ]; then
-            ${COMPOSE_MICRO} logs -f "$2"
+            ${COMPOSE_STACK} logs -f "$2"
         else
-            ${COMPOSE_MICRO} logs -f
+            ${COMPOSE_STACK} logs -f
         fi
         ;;
 
     "restart")
         echo -e "${YELLOW}Restarting all services...${NC}"
-        ${COMPOSE_MICRO} restart
+        ${COMPOSE_STACK} restart
         echo -e "${GREEN}Services restarted.${NC}"
         ;;
 
     "clean")
         echo -e "${YELLOW}Removing all containers and volumes...${NC}"
-        ${COMPOSE_MICRO} down -v --remove-orphans
-        ${COMPOSE_SINGLE} down -v --remove-orphans
+        ${COMPOSE_STACK} down -v --remove-orphans
         docker system prune -f
         echo -e "${GREEN}Cleanup complete.${NC}"
         ;;
 
     "kill")
         echo -e "${YELLOW}Killing all containers...${NC}"
-        ${COMPOSE_MICRO} down --remove-orphans
-        ${COMPOSE_SINGLE} down --remove-orphans
+        ${COMPOSE_STACK} down --remove-orphans
         echo -e "${GREEN}All containers killed.${NC}"
         ;;
 

@@ -8,7 +8,7 @@
 The following files have been created in your project root:
 
 ```
-~/projects1/ocpp_projekt_rollback6/evcsms/
+~/projects1/ocpp_projekt2.0/evcsms/
 ├── .prettierrc ...................... Code formatter configuration (open-source)
 ├── .eslintrc.json ................... JavaScript linter configuration (open-source)
 ├── .editorconfig .................... Editor consistency rules (open-source)
@@ -27,7 +27,7 @@ This is the **recommended approach** for maximum flexibility and zero licensing 
 
 #### Install Prettier (Free, Open-Source)
 ```bash
-cd ~/projects1/ocpp_projekt_rollback6/evcsms
+cd ~/projects1/ocpp_projekt2.0/evcsms
 npm install --save-dev prettier
 ```
 
@@ -187,7 +187,7 @@ npm --version
 ### Step 2: Create package.json
 
 ```bash
-cd ~/projects1/ocpp_projekt_rollback6/evcsms
+cd ~/projects1/ocpp_projekt2.0/evcsms
 
 npm init -y
 ```
@@ -251,7 +251,7 @@ git push
 All configuration files are open-source and can be committed to Git:
 
 ```bash
-cd ~/projects1/ocpp_projekt_rollback6/evcsms
+cd ~/projects1/ocpp_projekt2.0/evcsms
 
 git add .prettierrc .eslintrc.json .editorconfig package.json package-lock.json FRONTEND_SETUP.md
 git commit -m "Add frontend development tools (free & open-source)"
@@ -352,4 +352,4 @@ All tools are **100% free and open-source** with no licensing restrictions.
 
 **All tools are 100% free. No paid plugins or licenses needed!**
 
-
+# This file is for local/frontend developer setup only. Not needed in production.
